@@ -1,0 +1,211 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#080b18">
+    <title>Postfix Lab | Linked List Visualizer</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <header class="topbar">
+        <a class="brand" href="#">
+            <span class="brand-icon">⌘</span>
+            <span>POSTFIX<span class="brand-light">LAB</span>
+                <small>INTERACTIVE DSA STUDIO</small>
+            </span>
+        </a>
+        <div class="top-right">
+            <span class="live-badge"><span></span> SYSTEM READY</span>
+            <button class="reset-top" onclick="resetLab()">↻ Reset lab</button>
+        </div>
+    </header>
+
+    <main class="page">
+        <section class="hero">
+            <div class="eyebrow"><span>✦</span> DATA STRUCTURES · LINKED LISTS</div>
+            <h1>See every operation.<br><span>Understand every pointer.</span></h1>
+            <p class="hero-description">
+                Explore postfix expression evaluation through a live,
+                step-by-step linked-list stack.
+            </p>
+        </section>
+
+        <section class="panel expression-panel">
+            <div class="section-heading">
+                <div>
+                    <span class="section-kicker">01 / INPUT</span>
+                    <h2>Expression workspace</h2>
+                </div>
+                <span class="tiny-badge">POSTFIX NOTATION</span>
+            </div>
+
+            <label for="expression">YOUR EXPRESSION</label>
+            <div class="input-row">
+                <input id="expression" value="8 3 - 2 4 * + 6 /"
+                       spellcheck="false" autocomplete="off">
+                <button class="primary-button" onclick="startLab()">
+                    <span>▶</span> Evaluate
+                </button>
+            </div>
+
+            <div class="quick-examples">
+                <span>TRY AN EXAMPLE</span>
+                <button onclick="loadExample('8 3 - 2 4 * + 6 /')">Standard</button>
+                <button onclick="loadExample('10 2 -')">Subtraction</button>
+                <button onclick="loadExample('8 2 /')">Division</button>
+                <button onclick="loadExample('8 0 /')">Error test</button>
+            </div>
+        </section>
+
+        <section class="token-panel panel">
+            <div class="section-heading compact-heading">
+                <div>
+                    <span class="section-kicker">02 / EXECUTION</span>
+                    <h2>Token sequence</h2>
+                </div>
+                <span id="stepCounter" class="step-counter">READY TO BEGIN</span>
+            </div>
+            <div id="tokens" class="tokens">
+                <span class="empty-hint">Your tokens will appear here.</span>
+            </div>
+            <div class="progress-track">
+                <div id="progressBar"></div>
+            </div>
+        </section>
+
+        <section class="visual-grid">
+            <div class="panel memory-panel">
+                <div class="section-heading">
+                    <div>
+                        <span class="section-kicker">03 / LIVE MEMORY</span>
+                        <h2>Linked-list stack</h2>
+                    </div>
+                    <span class="memory-badge"><span></span> LIVE VIEW</span>
+                </div>
+
+                <div class="memory-legend">
+                    <span><i class="legend-dot top-dot"></i> Stack top</span>
+                    <span><i class="legend-dot node-dot"></i> Node</span>
+                    <span><i class="legend-dot pointer-dot"></i> Pointer</span>
+                </div>
+
+                <div id="stackCanvas" class="stack-canvas">
+                    <div class="empty-state">
+                        <div class="empty-icon">⌘</div>
+                        <h3>Waiting for execution</h3>
+                        <p>Run your expression to see nodes appear in memory.</p>
+                    </div>
+                </div>
+
+                <div class="memory-footer">
+                    <span><span class="status-dot"></span> NODE ALLOCATION</span>
+                    <span id="nodeCount">0 NODES</span>
+                </div>
+            </div>
+
+            <aside class="panel trace-panel">
+                <div class="section-heading">
+                    <div>
+                        <span class="section-kicker">04 / DEBUGGER</span>
+                        <h2>Operation trace</h2>
+                    </div>
+                    <span class="trace-icon">⌁</span>
+                </div>
+
+                <div class="trace-highlight">
+                    <span class="trace-label">CURRENT OPERATION</span>
+                    <h3 id="traceTitle">Ready to start</h3>
+                    <p id="traceDescription">Press Evaluate to begin stepping through the expression.</p>
+                </div>
+
+                <div class="operand-box">
+                    <div>
+                        <span>LEFT OPERAND</span>
+                        <strong id="leftOperand">—</strong>
+                    </div>
+                    <div class="operand-divider">−</div>
+                    <div>
+                        <span>RIGHT OPERAND</span>
+                        <strong id="rightOperand">—</strong>
+                    </div>
+                </div>
+
+                <div class="trace-details">
+                    <div><span>Action</span><strong id="actionValue">Waiting</strong></div>
+                    <div><span>Stack size</span><strong id="stackSize">0</strong></div>
+                    <div><span>Next pointer</span><strong id="pointerValue">None</strong></div>
+                </div>
+
+                <div id="message" class="message" aria-live="polite">
+                    Ready when you are.
+                </div>
+            </aside>
+        </section>
+
+        <section class="controls-panel panel">
+            <div>
+                <span class="section-kicker">STEP CONTROLS</span>
+                <h2>Control the execution</h2>
+                <p>Move through the expression one token at a time.</p>
+            </div>
+            <div class="control-buttons">
+                <button class="secondary-button" onclick="previousStep()" id="previousButton" disabled>← Previous</button>
+                <button class="primary-button" onclick="nextStep()" id="nextButton" disabled>Next step →</button>
+                <button class="secondary-button" onclick="resetLab()">↻ Reset</button>
+            </div>
+        </section>
+
+        <section class="stats-grid">
+            <article class="stat-card panel">
+                <span class="stat-icon cyan">⌘</span>
+                <span class="stat-label">CURRENT STACK</span>
+                <strong id="statNodes">0 <small>nodes</small></strong>
+                <p>Dynamic linked-list memory</p>
+            </article>
+            <article class="stat-card panel">
+                <span class="stat-icon purple">ϟ</span>
+                <span class="stat-label">TIME COMPLEXITY</span>
+                <strong>O(n)</strong>
+                <p>Each token processed once</p>
+            </article>
+            <article class="stat-card panel">
+                <span class="stat-icon green">▤</span>
+                <span class="stat-label">SPACE COMPLEXITY</span>
+                <strong>O(n)</strong>
+                <p>Nodes allocated as needed</p>
+            </article>
+            <article class="stat-card panel">
+                <span class="stat-icon orange">↗</span>
+                <span class="stat-label">PUSH / POP</span>
+                <strong>O(1)</strong>
+                <p>Operations at stack top</p>
+            </article>
+        </section>
+
+        <section class="panel result-panel">
+            <div class="result-symbol">✓</div>
+            <div>
+                <span class="section-kicker">FINAL OUTPUT</span>
+                <h2 id="finalResult">Awaiting result...</h2>
+                <p id="resultDescription">Complete the expression to reveal the final value.</p>
+            </div>
+            <div class="result-tag">POSTFIX ENGINE</div>
+        </section>
+
+        <footer>
+            <div class="footer-brand">POSTFIX<span>LAB</span></div>
+            <p>Built to make data structures visual. One node at a time.</p>
+            <span>PYTHON CONCEPTS · LINKED LISTS · STACKS</span>
+        </footer>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
