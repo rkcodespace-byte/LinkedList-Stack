@@ -1,12 +1,11 @@
-
 class Node {
-    constructor(data) {
-        this.data = data;
+    constructor(value) {
+        this.value = value;
         this.next = null;
     }
 }
 
-class Stack {
+class LinkedListStack {
     constructor() {
         this.top = null;
         this.size = 0;
@@ -20,381 +19,206 @@ class Stack {
     }
 
     pop() {
-        if (!this.top) throw Error("Insufficient operands");
-        const value = this.top.data;
+        if (!this.top) {
+            throw new Error("Stack underflow!");
+        }
+
+        const value = this.top.value;
         this.top = this.top.next;
         this.size--;
         return value;
     }
 
-    values() {
-        const result = [];
+    peek() {
+        return this.top ? this.top.value : null;
+    }
+
+    isEmpty() {
+        return this.top === null;
+    }
+
+    toArray() {
+        const values = [];
         let current = this.top;
 
         while (current) {
-            result.push(current.data);
+            values.push(current.value);
             current = current.next;
         }
 
-        return result;
+        return values;
     }
 }
 
+let stack = new LinkedListStack();
 let steps = [];
-let position = -1;
-let tokens = [];
-let failed = false;
+let currentStep = -1;
 
-const $ = id => document.getElementById(id);
+const expressionInput = document.getElementById("expression");
+const stackContainer = document.getElementById("stack");
+const output = document.getElementById("result");
+const status = document.getElementById("status");
+const trace = document.getElementById("trace");
 
-function fmt(n) {
-    return Number(n.toPrecision(10)).toString();
+function getExpression() {
+    return expressionInput?.value.trim() || "8 3 - 2 4 * + 6 /";
 }
 
-function buildSteps(expression) {
-    const stack = new Stack();
+function createSteps(expression) {
+    const tokens = expression.split(/\s+/);
+    const s = new LinkedListStack();
     const history = [];
-    const operators = ["+", "-", "*", "/"];
-    const input = expression.trim();
 
-    if (!input) throw Error("Please enter an expression.");
+    for (const token of tokens) {
+        const operators = ["+", "-", "*", "/"];
 
-    const parts = input.split(/\s+/);
-
-    for (let i = 0; i < parts.length; i++) {
-        const token = parts[i];
-        let action = "";
-        let left = "—";
-        let right = "—";
-
-        try {
-            if (/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(token)) {
-                const value = Number(token);
-                if (!Number.isFinite(value)) throw Error("Invalid number.");
-                stack.push(value);
-                action = `Push ${fmt(value)}`;
-            } else if (operators.includes(token)) {
-                if (stack.size < 2) {
-                    throw Error(`Insufficient operands for "${token}".`);
-                }
-
-                const b = stack.pop();
-                const a = stack.pop();
-
-                left = fmt(a);
-                right = fmt(b);
-
-                let result;
-
-                if (token === "+") result = a + b;
-                else if (token === "-") result = a - b;
-                else if (token === "*") result = a * b;
-                else {
-                    if (b === 0) throw Error("Division by zero.");
-                    result = a / b;
-                }
-
-                if (!Number.isFinite(result)) {
-                    throw Error("Result is outside the supported numeric range.");
-                }
-
-                stack.push(result);
-                action = `${left} ${token} ${right} = ${fmt(result)}`;
-            } else {
-                throw Error(`Invalid token "${token}".`);
+        if (operators.includes(token)) {
+            if (s.size < 2) {
+                throw new Error("Invalid expression: not enough operands.");
             }
 
+            const b = s.pop();
+            const a = s.pop();
+            let value;
+
+            switch (token) {
+                case "+": value = a + b; break;
+                case "-": value = a - b; break;
+                case "*": value = a * b; break;
+                case "/":
+                    if (b === 0) throw new Error("Division by zero.");
+                    value = a / b;
+                    break;
+            }
+
+            s.push(value);
             history.push({
                 token,
-                action,
-                left,
-                right,
-                stack: stack.values(),
-                error: "",
-                complete: false
+                message: `${a} ${token} ${b} = ${value}`,
+                stack: s.toArray()
             });
-        } catch (error) {
+        } else {
+            const number = Number(token);
+
+            if (token === "" || !Number.isFinite(number)) {
+                throw new Error(`Invalid token: ${token}`);
+            }
+
+            s.push(number);
             history.push({
                 token,
-                action: "Operation failed",
-                left,
-                right,
-                stack: stack.values(),
-                error: error.message,
-                complete: false
+                message: `Push ${number} onto the stack`,
+                stack: s.toArray()
             });
-            return history;
         }
     }
 
-    if (stack.size !== 1) {
-        history.push({
-            token: "!",
-            action: "Validation failed",
-            left: "—",
-            right: "—",
-            stack: stack.values(),
-            error: "Invalid expression: exactly one value must remain.",
-            complete: false
-        });
-    } else {
-        history[history.length - 1].complete = true;
-        history[history.length - 1].answer = stack.top.data;
+    if (s.size !== 1) {
+        throw new Error("Invalid expression: check the number of operators.");
     }
 
     return history;
 }
 
-function loadExample(expression) {
-    $("expression").value = expression;
-    startLab();
-}
+function renderStep() {
+    if (currentStep < 0 || !steps.length) return;
 
-function startLab() {
-    position = -1;
-    failed = false;
-    tokens = $("expression").value.trim().split(/\s+/).filter(Boolean);
+    const step = steps[currentStep];
 
-    $("result").textContent = "Result: --";
-    $("finalResult").textContent = "Awaiting result...";
-    $("resultDescription").textContent =
-        "Complete the expression to reveal the final value.";
-    $("message").className = "message";
+    if (stackContainer) {
+        stackContainer.innerHTML = "";
 
-    try {
-        steps = buildSteps($("expression").value);
-        renderTokens();
-        $("previousButton").disabled = true;
-        $("nextButton").disabled = false;
-        $("stepCounter").textContent = `0 / ${tokens.length} TOKENS`;
-        $("message").textContent = "Expression loaded. Start stepping through.";
-        $("operation").textContent = "Ready to execute";
-        $("traceTitle").textContent = "Ready to start";
-        $("traceDescription").textContent =
-            "Use Next Step to process the first token.";
-        $("actionValue").textContent = "Waiting";
-        $("leftOperand").textContent = "—";
-        $("rightOperand").textContent = "—";
-        $("stackSize").textContent = "0";
-        $("pointerValue").textContent = "None";
-        $("stackCanvas").innerHTML =
-            '<div class="empty-state"><div class="empty-icon">⌘</div>' +
-            '<h3>Stack initialized</h3><p>Take the first step to allocate a node.</p></div>';
-        $("nodeCount").textContent = "0 NODES";
-        $("statNodes").innerHTML = "0 <small>nodes</small>";
-        $("progressBar").style.width = "0%";
-        $("result").textContent = "Result: --";
-    } catch (error) {
-        showError(error.message);
-    }
-}
+        step.stack.forEach((value, index) => {
+            const node = document.createElement("div");
+            node.className = "stack-node";
+            node.textContent = Number(value.toFixed(6)).toString();
+            node.style.margin = "8px";
+            stackContainer.appendChild(node);
 
-function renderTokens() {
-    const area = $("tokens");
-    area.innerHTML = "";
-
-    tokens.forEach((token, i) => {
-        const chip = document.createElement("div");
-        chip.className = "token";
-        if (["+", "-", "*", "/"].includes(token)) {
-            chip.classList.add("operator");
-        }
-        if (i < position) chip.classList.add("done");
-        if (i === position) chip.classList.add("active");
-        chip.textContent = token;
-        area.appendChild(chip);
-    });
-}
-
-function renderStack(values) {
-    const area = $("stackCanvas");
-    area.innerHTML = "";
-
-    if (!values.length) {
-        area.innerHTML =
-            '<div class="empty-state"><div class="empty-icon">∅</div>' +
-            '<h3>Empty stack</h3><p>No nodes are currently stored in memory.</p></div>';
-    } else {
-        values.forEach((value, i) => {
-            const card = document.createElement("div");
-            card.className = "node-card" + (i === 0 ? " is-top" : "");
-
-            const label = document.createElement("span");
-            label.className = "node-label";
-            label.textContent = i === 0 ? "STACK TOP" : "NODE";
-
-            const number = document.createElement("strong");
-            number.textContent = fmt(value);
-
-            const pointer = document.createElement("small");
-            pointer.textContent = "next → " + (i === values.length - 1 ? "None" : "node");
-
-            card.append(label, number, pointer);
-            area.appendChild(card);
-
-            const arrow = document.createElement("span");
-            arrow.className = "pointer-arrow";
-            arrow.textContent = "→";
-            area.appendChild(arrow);
+            if (index < step.stack.length - 1) {
+                const arrow = document.createElement("div");
+                arrow.textContent = "↓";
+                arrow.className = "stack-arrow";
+                stackContainer.appendChild(arrow);
+            }
         });
-
-        const end = document.createElement("span");
-        end.className = "null-node";
-        end.textContent = "None";
-        area.appendChild(end);
     }
 
-    $("nodeCount").textContent = `${values.length} NODE${values.length === 1 ? "" : "S"}`;
-    $("stackSize").textContent = values.length;
-    $("statNodes").innerHTML = `${values.length} <small>nodes</small>`;
-    $("pointerValue").textContent = values.length > 1 ? "Next node" : "None";
+    if (status) {
+        status.textContent = `Step ${currentStep + 1} of ${steps.length}`;
+    }
+
+    if (trace) {
+        trace.textContent = step.message;
+    }
+
+    if (output) {
+        output.textContent =
+            currentStep === steps.length - 1
+                ? `Result: ${step.stack[0]}`
+                : "Processing...";
+    }
+
+    const nextButton = document.getElementById("nextBtn");
+    const prevButton = document.getElementById("prevBtn");
+
+    if (nextButton) nextButton.disabled = currentStep >= steps.length - 1;
+    if (prevButton) prevButton.disabled = currentStep <= 0;
 }
 
-function showError(message) {
-    failed = true;
-    $("message").textContent = "⚠ " + message;
-    $("message").className = "message error";
-    $("traceTitle").textContent = "Execution error";
-    $("traceDescription").textContent = message;
-    $("finalResult").textContent = "Expression invalid";
-    $("resultDescription").textContent = message;
-    $("result").textContent = "Result: Error";
-    $("nextButton").disabled = true;
+function evaluatePostfix() {
+    try {
+        steps = createSteps(getExpression());
+        currentStep = 0;
+        renderStep();
+    } catch (error) {
+        if (output) output.textContent = error.message;
+        if (status) status.textContent = "Evaluation failed";
+    }
 }
 
 function nextStep() {
-    if (failed || position >= steps.length - 1) return;
-
-    position++;
-    const step = steps[position];
-
-    renderTokens();
-    renderStack(step.stack);
-
-    $("stepCounter").textContent =
-        `${Math.min(position + 1, tokens.length)} / ${tokens.length} TOKENS`;
-
-    $("progressBar").style.width =
-        `${Math.min(100, (position + 1) / tokens.length * 100)}%`;
-
-    $("traceTitle").textContent = step.error
-        ? "Operation failed"
-        : step.action;
-
-    $("traceDescription").textContent = step.error
-        ? step.error
-        : ["+", "-", "*", "/"].includes(step.token)
-            ? "The right operand is popped first, then the left operand. The result is pushed back onto the stack."
-            : "A new linked-list node is allocated and placed at the top of the stack.";
-
-    $("operation").textContent = "Operation: " + step.action;
-    $("actionValue").textContent = step.error ? "Error" :
-        ["+", "-", "*", "/"].includes(step.token) ? "Pop → Calculate → Push" : "Push";
-
-    $("leftOperand").textContent = step.left;
-    $("rightOperand").textContent = step.right;
-
-    if (step.error) {
-        showError(step.error);
-        $("previousButton").disabled = position <= 0;
-        return;
+    if (currentStep < steps.length - 1) {
+        currentStep++;
+        renderStep();
     }
-
-    $("message").className = "message";
-    $("message").textContent = "✓ " + step.action;
-
-    if (step.complete) {
-        const answer = fmt(step.answer);
-        $("finalResult").textContent = answer;
-        $("resultDescription").textContent =
-            "All tokens processed successfully. One value remains on the stack.";
-        $("result").textContent = "Result: " + answer;
-        $("message").textContent = "✓ Evaluation completed successfully!";
-        $("traceTitle").textContent = "Evaluation complete";
-        $("traceDescription").textContent =
-            "The stack contains exactly one value: the final result.";
-    } else {
-        $("finalResult").textContent = "In progress...";
-        $("resultDescription").textContent =
-            "Continue to process the remaining tokens.";
-        $("result").textContent = "Result: --";
-    }
-
-    $("previousButton").disabled = position <= 0;
-    $("nextButton").disabled = position >= steps.length - 1;
 }
 
 function previousStep() {
-    if (position <= 0) return;
-
-    position--;
-    failed = false;
-
-    const step = steps[position];
-
-    renderTokens();
-    renderStack(step.stack);
-
-    $("stepCounter").textContent =
-        `${Math.min(position + 1, tokens.length)} / ${tokens.length} TOKENS`;
-
-    $("progressBar").style.width =
-        `${Math.min(100, (position + 1) / tokens.length * 100)}%`;
-
-    $("traceTitle").textContent = step.action;
-    $("traceDescription").textContent = "Viewing a previous execution state.";
-    $("operation").textContent = "Operation: " + step.action;
-    $("actionValue").textContent = step.action.startsWith("Push")
-        ? "Push" : "Pop → Calculate → Push";
-    $("leftOperand").textContent = step.left;
-    $("rightOperand").textContent = step.right;
-    $("message").className = "message";
-    $("message").textContent = "Viewing step " + (position + 1) + ".";
-
-    $("finalResult").textContent = "In progress...";
-    $("resultDescription").textContent =
-        "Continue to process the remaining tokens.";
-    $("result").textContent = "Result: --";
-
-    $("previousButton").disabled = position <= 0;
-    $("nextButton").disabled = false;
+    if (currentStep > 0) {
+        currentStep--;
+        renderStep();
+    }
 }
 
 function resetLab() {
     steps = [];
-    tokens = [];
-    position = -1;
-    failed = false;
+    currentStep = -1;
 
-    $("tokens").innerHTML = '<span class="empty-hint">Your tokens will appear here.</span>';
-    $("stackCanvas").innerHTML =
-        '<div class="empty-state"><div class="empty-icon">⌘</div>' +
-        '<h3>Waiting for execution</h3>' +
-        '<p>Run your expression to see nodes appear in memory.</p></div>';
+    if (stackContainer) stackContainer.innerHTML = "";
+    if (output) output.textContent = "Waiting for evaluation...";
+    if (status) status.textContent = "Ready";
+    if (trace) trace.textContent = "Enter an expression and click Evaluate.";
 
-    $("stepCounter").textContent = "READY TO BEGIN";
-    $("progressBar").style.width = "0%";
-    $("operation").textContent = "Operation: Waiting...";
-    $("traceTitle").textContent = "Ready to start";
-    $("traceDescription").textContent = "Press Evaluate to begin stepping through the expression.";
-    $("actionValue").textContent = "Waiting";
-    $("leftOperand").textContent = "—";
-    $("rightOperand").textContent = "—";
-    $("stackSize").textContent = "0";
-    $("pointerValue").textContent = "None";
-    $("nodeCount").textContent = "0 NODES";
-    $("statNodes").innerHTML = '0 <small>nodes</small>';
-    $("message").textContent = "Ready when you are.";
-    $("message").className = "message";
-    $("finalResult").textContent = "Awaiting result...";
-    $("resultDescription").textContent = "Complete the expression to reveal the final value.";
-    $("result").textContent = "Result: --";
-    $("previousButton").disabled = true;
-    $("nextButton").disabled = true;
+    const nextButton = document.getElementById("nextBtn");
+    const prevButton = document.getElementById("prevBtn");
+
+    if (nextButton) nextButton.disabled = true;
+    if (prevButton) prevButton.disabled = true;
 }
 
-$("expression").addEventListener("keydown", event => {
-    if (event.key === "Enter") startLab();
-});
+document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("evaluateBtn")
+        ?.addEventListener("click", evaluatePostfix);
 
-startLab();
+    document.getElementById("nextBtn")
+        ?.addEventListener("click", nextStep);
+
+    document.getElementById("prevBtn")
+        ?.addEventListener("click", previousStep);
+
+    document.getElementById("resetBtn")
+        ?.addEventListener("click", resetLab);
+
+    resetLab();
+});
